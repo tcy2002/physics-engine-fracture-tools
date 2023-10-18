@@ -1,7 +1,6 @@
 #pragma once
 
 #include "vector3.h"
-#include <utility>
 #include <vector>
 
 PHYS_NAMESPACE_BEGIN
@@ -92,7 +91,11 @@ FORCE_INLINE bool calc_line_plane_intersection(const Vector3& p, const Vector3& 
 }
 
 FORCE_INLINE bool is_point_upside_plane(const Vector3& p, const Vector3& n, const Vector3& v) {
-    return dot(v - p, n) > 0;
+    return dot(v - p, n) > EPS;
+}
+
+FORCE_INLINE bool is_point_on_plane(const Vector3& p, const Vector3& n, const Vector3& v) {
+    return approx_equal(dot(v - p, n), 0);
 }
 
 FORCE_INLINE bool is_point_inside_sphere(const Vector3& p, const Vector3& center, Real radius) {
@@ -140,10 +143,6 @@ FORCE_INLINE bool are_points_on_line(const Vector3& p, const Vector3& v1, const 
     return true;
 }
 
-FORCE_INLINE bool is_point_on_plane(const Vector3& v, const Vector3& p, const Vector3& n) {
-    return approx_equal(dot(v - p, n), 0);
-}
-
 template <typename T>
 FORCE_INLINE void sort3(T& v1, T& v2, T& v3) {
     if (v1 > v2) {
@@ -163,9 +162,6 @@ struct vertex {
     Vector3 nor;
     vertex() = default;
     vertex(const Vector3& p, const Vector3& n): pos(p), nor(n) {}
-    bool operator==(const vertex& p) const {
-        return approx_equal(pos, p.pos) && approx_equal(nor, p.nor);
-    }
 };
 
 struct triangle {
@@ -175,11 +171,6 @@ struct triangle {
         vert_ids[0] = v1;
         vert_ids[1] = v2;
         vert_ids[2] = v3;
-    }
-    bool operator==(const triangle& t) const {
-        return (vert_ids[0] == t.vert_ids[0] || vert_ids[0] == t.vert_ids[1] || vert_ids[0] == t.vert_ids[2]) &&
-               (vert_ids[1] == t.vert_ids[0] || vert_ids[1] == t.vert_ids[1] || vert_ids[1] == t.vert_ids[2]) &&
-               (vert_ids[2] == t.vert_ids[0] || vert_ids[2] == t.vert_ids[1] || vert_ids[2] == t.vert_ids[2]);
     }
 };
 
@@ -218,26 +209,31 @@ struct simple_mesh {
     std::vector<Vector3> vertices;
     std::vector<Vector3> normals;
     std::vector<uint32_t> indices;
+    void clear() {
+        vertices.clear();
+        normals.clear();
+        indices.clear();
+    }
 };
 /*******************************************************************************/
 
 PHYS_NAMESPACE_END
 
 uint32_t hash_func(const physeng::Vector3& v) {
-    auto x = (uint32_t)(v.getX() / EPS);
-    auto y = (uint32_t)(v.getY() / EPS);
-    auto z = (uint32_t)(v.getZ() / EPS);
-    return x * 73856093u ^ y * 19349663u ^ z * 83492791u;
+    auto x = (uint32_t)round(v.getX() / EPS);
+    auto y = (uint32_t)round(v.getY() / EPS);
+    auto z = (uint32_t)round(v.getZ() / EPS);
+    return (x * 73856093u) ^ (y * 19349663u) ^ (z * 83492791u);
 }
 
 uint32_t hash_func(const physeng::vertex& v) {
-    return hash_func(v.pos) ^ hash_func(v.nor) * 31u;
+    return hash_func(v.pos) ^ (hash_func(v.nor) * 31u);
 }
 
 uint32_t hash_func(const physeng::triangle& t) {
     uint32_t v1 = t.vert_ids[0], v2 = t.vert_ids[1], v3 = t.vert_ids[2];
     physeng::sort3(v1, v2, v3);
-    return v1 * 73856093u ^ v2 * 19349663u ^ v3 * 83492791u;
+    return (v1 * 73856093u) ^ (v2 * 19349663u) ^ (v3 * 83492791u);
 }
 
 uint32_t hash_func(const physeng::polygon& p) {
@@ -246,4 +242,26 @@ uint32_t hash_func(const physeng::polygon& p) {
 
 uint32_t hash_func(const uint32_t& i) {
     return i;
+}
+
+bool equal(const physeng::Vector3& a, const physeng::Vector3& b) {
+    return approx_equal(a, b);
+}
+
+bool equal(const physeng::vertex& a, const physeng::vertex& b) {
+    return approx_equal(a.pos, b.pos) && approx_equal(a.nor, b.nor);
+}
+
+bool equal(const physeng::triangle& a, const physeng::triangle& b) {
+    return (a.vert_ids[0] == b.vert_ids[0] || a.vert_ids[0] == b.vert_ids[1] || a.vert_ids[0] == b.vert_ids[2]) &&
+           (a.vert_ids[1] == b.vert_ids[0] || a.vert_ids[1] == b.vert_ids[1] || a.vert_ids[1] == b.vert_ids[2]) &&
+           (a.vert_ids[2] == b.vert_ids[0] || a.vert_ids[2] == b.vert_ids[1] || a.vert_ids[2] == b.vert_ids[2]);
+}
+
+bool equal(const physeng::polygon& a, const physeng::polygon& b) {
+    return approx_equal(a.nor, b.nor);
+}
+
+bool equal(const uint32_t& a, const uint32_t& b) {
+    return a == b;
 }

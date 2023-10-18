@@ -1,8 +1,6 @@
 #pragma once
 
-#include "general.h"
 #include "voronoi_calculator.h"
-#include <map>
 #include <algorithm>
 
 PHYS_NAMESPACE_BEGIN
@@ -15,6 +13,7 @@ private:
         uint32_t point_count = _voronoi.point_count();
         triangle_manager worker(mesh);
 
+        // generate the new meshes of each point
         for (uint32_t i = 0; i < point_count; i++) {
             triangle_manager result;
             cut_mesh_of_one(worker, i, result);
@@ -27,6 +26,7 @@ private:
         auto point = _voronoi.get_point(idx);
         auto adjacent_point_ids = _voronoi.get_adjacency(idx);
 
+        // cut the mesh by each adjacent point
         new_mesh = mesh;
         for (auto other_id : adjacent_point_ids) {
             auto other = _voronoi.get_point(other_id);
@@ -48,11 +48,11 @@ private:
         for (uint32_t face_id = 0; face_id < face_count; face_id++) {
             inter_points.append(cut_face_by_plane(face_id, old_mesh, p, n, new_mesh));
         }
-
-        // add the new face of the cutting plane
-        if (inter_points.empty()) {
+        if (inter_points.size() < 3) {
             return;
         }
+
+        // add the new face of the cutting plane
         polygon new_face(n);
         auto sorted_points = inter_points.to_vector();
         std::sort(sorted_points.begin() + 1, sorted_points.end(), [&](const Vector3& a, const Vector3& b) {
@@ -65,54 +65,56 @@ private:
     }
 
     static std::vector<Vector3> cut_face_by_plane(uint32_t face_id, triangle_manager& old_mesh, const Vector3& p, const Vector3& n, triangle_manager& new_mesh) {
-        std::vector<uint32_t> new_point_ids;
-        std::vector<Vector3> inter_points;
         auto face = old_mesh.get_face(face_id);
         uint32_t vert_count = face.vert_ids.size();
+        hash_vector<Vector3> inter_points(vert_count);
+        std::vector<vertex> vertices(vert_count);
+        std::vector<int> side(vert_count, -1);
+        hash_vector<uint32_t> new_point_ids(vert_count * 2);
 
+        // check the side of each vertex to the cutting plane
         for (int i = 0; i < vert_count; i++) {
-            auto v1 = old_mesh.get_vertex(face.vert_ids[i]);
-            auto v2 = old_mesh.get_vertex(face.vert_ids[(i + 1) % vert_count]);
+            vertices[i] = old_mesh.get_vertex(face.vert_ids[i]);
+            side[i] = is_point_on_plane(p, n, vertices[i].pos) ? 0 : -1;
+            side[i] = is_point_upside_plane(p, n, vertices[i].pos) ? 1 : -1;
+        }
 
-            if (i == 0 && !is_point_upside_plane(p, n, v1.pos)) {
-                new_point_ids.push_back(new_mesh.add_vertex(v1.pos, v1.nor));
-                std::cout << new_point_ids.back() << " " << v1.pos << " ";
-            }
+        // traverse the segments in order, and add at most 2 intersection points
+        for (uint32_t i = 0; i < vert_count; i++) {
+            uint32_t j = (i + 1) % vert_count;
+            side[i] == 0 && inter_points.push_back(vertices[i].pos);
+            side[j] == 0 && inter_points.push_back(vertices[j].pos);
+
+            i == 0 && side[i] <= 0 &&
+            new_point_ids.push_back(new_mesh.add_vertex(vertices[i].pos, vertices[i].nor));
 
             Vector3 inter;
             Real t;
-            if (calc_line_plane_intersection(p, n, v1.pos, v2.pos, inter, t)) {
-                auto nor = (v2.nor * t + v1.nor * (1 - t)).normalized();
+            if (side[i] * side[j] < 0) {
+                calc_line_plane_intersection(p, n, vertices[i].pos, vertices[j].pos, inter, t);
+                auto nor = (vertices[j].nor * t + vertices[i].nor * (1 - t)).normalized();
                 new_point_ids.push_back(new_mesh.add_vertex(inter, nor));
-                std::cout << new_point_ids.back() << " " << inter << " ";
                 inter_points.push_back(inter);
             }
 
-            if (i != vert_count - 1 && !is_point_upside_plane(p, n, v2.pos)) {
-                new_point_ids.push_back(new_mesh.add_vertex(v2.pos, v2.nor));
-                std::cout << new_point_ids.back() << " " << v2.pos << " ";
-            }
+            j != 0 && side[j] <= 0 &&
+            new_point_ids.push_back(new_mesh.add_vertex(vertices[j].pos, vertices[j].nor));
         }
-        std::cout << std::endl;
 
-        if (new_point_ids.empty()) {
-            return {};
+        // some corner cases
+        if (new_point_ids.size() < 3) {
+            return inter_points.to_vector();
         }
+
+        // add the remaining face downside the cutting plane
         polygon new_face;
         auto v1 = new_mesh.get_vertex(new_point_ids[0]).pos;
         auto v2 = new_mesh.get_vertex(new_point_ids[1]).pos;
         auto v3 = new_mesh.get_vertex(new_point_ids[2]).pos;
-        new_face.nor = cross(v2 - v1, v3 - v1);
-        if (new_face.nor.fuzzyZero()) {
-            // TODO: ???
-            std::cout << "bomb!" << std::endl;
-            return inter_points;
-        } else {
-            new_face.nor.normalize();
-        }
-        new_face.vert_ids = new_point_ids;
+        new_face.nor = cross(v2 - v1, v3 - v1).normalized();
+        new_face.vert_ids = new_point_ids.to_vector();
         new_mesh.add_face(new_face);
-        return inter_points;
+        return inter_points.to_vector();
     }
 
 public:

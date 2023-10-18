@@ -1,21 +1,11 @@
 #pragma once
 
+#include "general.h"
+#include <iostream>
 #include <vector>
 #include <cstdint>
 
 #define NOT_FOUND UINT32_MAX
-
-/**
- * @brief A hash vector, similar usage to std::vector, but
- * can provide high efficiency on sequential write and random
- * search.
- *
- * Capacity and hash function is user-given.
- *
- * Custom type must overload the '==' operator, and you must
- * register the hash function of custom type like:
- * uint32_t hash_func(const T& item) {}
- */
 
 // example: hash function for std::string
 uint32_t hash_func(const std::string& str) {
@@ -26,6 +16,26 @@ uint32_t hash_func(const std::string& str) {
     return hash;
 }
 
+// example: equal function for std::string
+bool equal(const std::string& a, const std::string& b) {
+    return a == b;
+}
+
+/**
+ * @brief A hash vector, similar usage to std::vector, but
+ * can provide high efficiency on sequential write and random
+ * search.
+ *
+ * Capacity and hash function is user-given.
+ *
+ * You must register the hash function of custom type like:
+ * uint32_t hash_func(const T& item) {}
+ * and the equal function like:
+ * bool equal(const T& a, const T& b) {}
+ * reason: some '==' operator has already been overloaded, and
+ * custom type may use other strategy to compare equality, e.g.
+ * Vector3
+ */
 template <typename T>
 ATTRIBUTE_ALIGNED16(class) hash_vector {
 private:
@@ -88,6 +98,10 @@ public:
         }
     }
 
+    /*
+     * not safe: you should not modify the essential data
+     * that affect hash value, or consider using replace.
+     */
     T& operator[](uint32_t idx) {
         return list[idx];
     }
@@ -124,7 +138,7 @@ public:
         auto p = index_table[hash(item)];
         while (p->next != nullptr) {
             p = p->next;
-            if (list[p->val] == item) {
+            if (equal(list[p->val], item)) {
                 return true;
             }
         }
@@ -135,7 +149,7 @@ public:
         auto p = index_table[hash(item)];
         while (p->next != nullptr) {
             p = p->next;
-            if (list[p->val] == item) {
+            if (equal(list[p->val], item)) {
                 return p->val;
             }
         }
@@ -146,7 +160,7 @@ public:
         auto p = index_table[hash(item)];
         while (p->next != nullptr) {
             p = p->next;
-            if (list[p->val] == item) {
+            if (equal(list[p->val], item)) {
                 return false;
             }
         }
@@ -177,7 +191,7 @@ public:
         auto p = index_table[hash(item)];
         while (p->next != nullptr) {
             p = p->next;
-            if (list[p->val] == item) {
+            if (equal(list[p->val], item)) {
                 return false;
             }
         }
@@ -254,7 +268,7 @@ public:
         auto p = index_table[hash(item)];
         while (p->next != nullptr) {
             p = p->next;
-            if (list[p->val] == item) {
+            if (equal(list[p->val], item)) {
                 return false;
             }
         }

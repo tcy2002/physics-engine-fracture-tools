@@ -1,10 +1,9 @@
 #pragma once
 
-#include <map>
 #include <vector>
 #include <algorithm>
 #include "triangle_manager.h"
-#include "math_utils.h"
+#include "utils.h"
 
 PHYS_NAMESPACE_BEGIN
 
@@ -162,9 +161,6 @@ public:
         generate(points);
         remove_bounding_box();
         get_adjacency_list();
-        std::cout << "vertex count: " << _manager.vertex_count() << std::endl;
-        std::cout << "triangle count: " << _manager.triangle_count() << std::endl;
-        std::cout << "tetrahedron count: " << _manager.tetrahedron_count() << std::endl;
     }
 
     uint32_t point_count() const {

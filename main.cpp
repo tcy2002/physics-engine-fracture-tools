@@ -1,7 +1,7 @@
 #define USE_DOUBLE
 
 #include <iostream>
-#include "math_utils.h"
+#include "utils.h"
 #include "hash_vector.h"
 #include "test_vector.h"
 #include "voronoi_calculator.h"
@@ -24,11 +24,14 @@ void mesh_to_obj(const physeng::simple_mesh& mesh, const std::string& filename) 
         file << "f " << mesh.indices[i] + 1 << "//" << mesh.indices[i] + 1 << " "
              << mesh.indices[i + 1] + 1 << "//" << mesh.indices[i + 1] + 1 << " "
              << mesh.indices[i + 2] + 1 << "//" << mesh.indices[i + 2] + 1 << std::endl;
-//        file << "f " << mesh.indices[i] + 1 << " "
-//             << mesh.indices[i + 1] + 1 << " "
-//             << mesh.indices[i + 2] + 1 << std::endl;
     }
     file.close();
+}
+
+physeng::Vector3 random_point() {
+    static std::default_random_engine e(GetTickCount());
+    static std::uniform_real_distribution<Real> d(0.1, 0.9);
+    return {d(e), d(e), d(e)};
 }
 
 int main()
@@ -235,7 +238,7 @@ int main()
 //        std::cout << std::endl;
 //    }
 
-//    // test for fracture_calculator
+    // test for fracture_calculator
     physeng::fracture_calculator calculator;
     physeng::simple_mesh mesh = {
             {
@@ -305,18 +308,38 @@ int main()
                 20, 22, 23,
             }
     };
-    std::vector<physeng::Vector3> points = {
-            {0.2, 0.2, 0.8},
-            {0.5, 0.8, 0.5},
-            {0.8, 0.2, 0.4},
-            {0.5, 0.5, 0.5}
-    };
+    hash_vector<physeng::Vector3> points(100);
+    for (int i = 0; i < 50; i++) {
+        points.push_back(random_point());
+    }
 //    mesh_to_obj(mesh, "../cube.obj");
     std::vector<physeng::simple_mesh> results;
-    calculator.fracture(mesh, points, results);
+    DWORD start, end;
+    start = GetTickCount();
+    calculator.fracture(mesh, points.to_vector(), results);
+    end = GetTickCount();
+    std::cout << "fracture: " << end - start << "ms" << std::endl;
     for (auto& result : results) {
         mesh_to_obj(result, "../mesh" + std::to_string(&result - &results[0]) + ".obj");
     }
+
+    // test for plane segmentation
+//    physeng::triangle_manager old_mesh(mesh), new_mesh, new_new_mesh;
+//    physeng::simple_mesh result;
+//
+//    auto p = (points[0] + points[1]) / 2;
+//    auto n = (points[0] - points[1]).normalized();
+//    physeng::fracture_calculator::cut_mesh_by_plane(old_mesh, p, n, new_mesh);
+//    new_mesh.to_triangles();
+//    new_mesh.export_to_mesh(result);
+//    mesh_to_obj(result, "../mesh_test1.obj");
+//
+//    p = (points[2] + points[1]) / 2;
+//    n = (points[2] - points[1]).normalized();
+//    physeng::fracture_calculator::cut_mesh_by_plane(new_mesh, p, n, new_new_mesh);
+//    new_new_mesh.to_triangles();
+//    new_new_mesh.export_to_mesh(result);
+//    mesh_to_obj(result, "../mesh_test2.obj");
 
     return 0;
 }

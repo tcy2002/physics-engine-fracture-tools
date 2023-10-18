@@ -1,6 +1,6 @@
 #pragma once
 
-#include "math_utils.h"
+#include "utils.h"
 #include "hash_vector.h"
 
 PHYS_NAMESPACE_BEGIN
@@ -11,7 +11,8 @@ PHYS_NAMESPACE_BEGIN
 
 /**
  * @brief The mesh manager class, which is used to manage the
- * mesh data, including vertices, triangles and tetrahedrons.
+ * mesh data, including vertices, triangles, faces(2d polygons)
+ * and tetrahedrons.
  */
 ATTRIBUTE_ALIGNED16(class) triangle_manager {
 private:
@@ -42,18 +43,6 @@ public:
 
     uint32_t vertex_count() const {
         return _vertices.size();
-    }
-
-    uint32_t triangle_count() const {
-        return _triangles.size();
-    }
-
-    uint32_t face_count() const {
-        return _faces.size();
-    }
-
-    uint32_t tetrahedron_count() const {
-        return _tetrahedrons.size();
     }
 
     uint32_t add_vertex(const Vector3& p, const Vector3& n = Vector3::Up()) {
@@ -90,6 +79,10 @@ public:
         _vertices.clear();
     }
 
+    uint32_t triangle_count() const {
+        return _triangles.size();
+    }
+
     uint32_t add_triangle(uint32_t v1, uint32_t v2, uint32_t v3) {
         triangle new_tri(v1, v2, v3);
         uint32_t idx = _triangles.index_of(new_tri);
@@ -121,6 +114,10 @@ public:
         _triangles.clear();
     }
 
+    uint32_t face_count() const {
+        return _faces.size();
+    }
+
     void add_face(const polygon& face) {
         _faces.push_back(face);
     }
@@ -135,6 +132,10 @@ public:
 
     void clear_faces() {
         _faces.clear();
+    }
+
+    uint32_t tetrahedron_count() const {
+        return _tetrahedrons.size();
     }
 
     void add_tetrahedron(uint32_t t1, uint32_t t2, uint32_t t3, uint32_t t4,
@@ -189,6 +190,7 @@ public:
     }
 
     void to_triangles() {
+        clear_triangles();
         for (auto& face : _faces) {
             uint32_t count = face.vert_ids.size();
             for (int i = 1; i < count - 1; i++) {
@@ -201,10 +203,7 @@ public:
         // import the mesh data from a mesh (not standard format, but will
         // be automatically transformed into)
         ASSERT(mesh.vertices.size() == mesh.normals.size() && mesh.indices.size() % 3 == 0);
-
-        _vertices.clear();
-        _triangles.clear();
-        _tetrahedrons.clear();
+        clear();
 
         std::vector<uint32_t> vert_ids(mesh.vertices.size());
         uint32_t vert_count = mesh.vertices.size(), idx_count = mesh.indices.size();
@@ -219,6 +218,7 @@ public:
 
     void export_to_mesh(simple_mesh& mesh) {
         // export the mesh data into a mesh (standard format)
+        mesh.clear();
         uint32_t vert_size = _vertices.size(), tri_size = _triangles.size();
 
         mesh.vertices.resize(vert_size);
