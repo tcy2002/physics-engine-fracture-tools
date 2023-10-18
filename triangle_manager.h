@@ -13,6 +13,21 @@ PHYS_NAMESPACE_BEGIN
  * @brief The mesh manager class, which is used to manage the
  * mesh data, including vertices, triangles, faces(2d polygons)
  * and tetrahedrons.
+ *
+ * Data of vertices, triangles and faces are stored in hash_vector,
+ * since they need both sequence information and random access
+ * efficiency.
+ *
+ * A general mesh has some features:
+ * - it's composed of polygonal faces, and each face consists of
+ *   several triangles;
+ * - each vertices has its own normal, but all the triangles of a
+ *   face share the same normal;
+ * - each vertices of a face must be in the same plane, and the
+ *   positions must differ, but vertices of different faces may be
+ *   the same position, as long as they have different normals.
+ * This structure can automatically cater to these features, and
+ * provide some efficiency for the upper layer.
  */
 ATTRIBUTE_ALIGNED16(class) triangle_manager {
 private:
@@ -167,9 +182,11 @@ public:
         auto n = cross(v2p - v1p, v3p - v1p).normalized();
         uint32_t vs[] = {v1i, v2i, v3i};
 
+        // use normal to identify a face
         polygon new_face(n);
         uint32_t face_id = _faces.index_of(new_face);
         if (face_id != NOT_FOUND) {
+            // insert the new vertex into the appropriate place
             uint32_t count = _faces[face_id].vert_ids.size();
             for (int i = 0; i < count; i++) {
                 for (int j = 0; j < 3; j++) {
@@ -190,6 +207,7 @@ public:
     }
 
     void to_triangles() {
+        // transform faces into triangles
         clear_triangles();
         for (auto& face : _faces) {
             uint32_t count = face.vert_ids.size();

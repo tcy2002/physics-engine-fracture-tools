@@ -5,6 +5,27 @@
 
 PHYS_NAMESPACE_BEGIN
 
+/**
+ * @brief The core class to calculate the fracture of a mesh.
+ *
+ * Input: a simple mesh, positions of fragments
+ * Output: fragment meshes
+ *
+ * Current algorithm only support convex mesh, no limitation
+ * on other aspects.
+ *
+ * Calculation process:
+ * 1. triangulate the fragment positions into voronoi diagram;
+ * 2. read and transform mesh data from triangles into faces;
+ * 3. cut the origin mesh by each voronoi cell:
+ *   3.1. sequentially cut by each median plane:
+ *     3.1.1. cut each face of the mesh;
+ *     3.1.2. add a new face of the cutting plane;
+ *   3.2. regenerate triangles from faces;
+ *   3.3. output the new mesh of the cell.
+ * Be aware: input and output mesh is stored in simple_mesh,
+ * which need to be transformed in advance.
+ */
 ATTRIBUTE_ALIGNED16(class) fracture_calculator {
 private:
     voronoi_calculator _voronoi{};
@@ -52,7 +73,7 @@ private:
             return;
         }
 
-        // add the new face of the cutting plane
+        // add a new face of the cutting plane
         polygon new_face(n);
         auto sorted_points = inter_points.to_vector();
         std::sort(sorted_points.begin() + 1, sorted_points.end(), [&](const Vector3& a, const Vector3& b) {

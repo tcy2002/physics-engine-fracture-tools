@@ -28,7 +28,7 @@ bool equal(const std::string& a, const std::string& b) {
  *
  * Capacity and hash function is user-given.
  *
- * You must register the hash function of custom type like:
+ * Must register the hash function of custom type like:
  * uint32_t hash_func(const T& item) {}
  * and the equal function like:
  * bool equal(const T& a, const T& b) {}
@@ -98,12 +98,20 @@ public:
         }
     }
 
-    /*
-     * not safe: you should not modify the essential data
-     * that affect hash value, or consider using replace.
+    /**
+     * @brief not safe: you should not modify the essential data
+     * that affect hash value, otherwise consider using replace.
      */
     T& operator[](uint32_t idx) {
         return list[idx];
+    }
+
+    /**
+     * @brief not safe: you should not modify the essential data
+     * that affect hash value, otherwise consider using replace.
+     */
+    T& back() {
+        return list.back();
     }
 
     auto begin() {
@@ -112,10 +120,6 @@ public:
 
     auto end() {
         return list.cend();
-    }
-
-    const T& back() {
-        return list.back();
     }
 
     uint32_t size() const {

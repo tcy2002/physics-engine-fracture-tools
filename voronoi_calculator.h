@@ -9,7 +9,16 @@ PHYS_NAMESPACE_BEGIN
 
 /**
  * @brief A class to calculate the 3d delaunay triangulation
- * of a set of points. Based on the Bowyer-Watson algorithm.
+ * of a set of points.
+ *
+ * Based on the Bowyer-Watson algorithm.
+ * process:
+ * 1. add a bounding box to the diagram;
+ * 2. sequentially add each point to the diagram:
+ *   2.1. find all tetrahedrons that don't cater to the Delaunay condition;
+ *   2.2. find all triangles that are supposed to be removed;
+ *   2.3. add the new point, and corresponding triangles and tetrahedrons;
+ * 3. remove the bounding box.
  */
 ATTRIBUTE_ALIGNED16(class) voronoi_calculator {
 private:
