@@ -18,6 +18,8 @@ PHYS_NAMESPACE_BEGIN
  * since they need both sequence information and random access
  * efficiency.
  *
+ * Only support convex mesh, no limitation on other aspects.
+ *
  * A general mesh has some features:
  * - it's composed of polygonal faces, and each face consists of
  *   several triangles;
@@ -36,18 +38,23 @@ private:
     hash_vector<polygon> _faces;
     std::vector<tetrahedron> _tetrahedrons;
 
+    void to_triangles() {
+        // transform faces into triangles
+        clear_triangles();
+        uint32_t face_count = _faces.size();
+        for (int i = 0; i < face_count; i++) {
+            uint32_t vert_count = _faces[i].vert_ids.size();
+            for (int j = 1; j < vert_count - 1; j++) {
+                add_triangle(_faces[i].vert_ids[0], _faces[i].vert_ids[j], _faces[i].vert_ids[j + 1]);
+            }
+        }
+    }
+
 public:
     triangle_manager():
     _vertices(VERTEX_CAPACITY),
     _triangles(TRIANGLE_CAPACITY),
     _faces(FACE_CAPACITY) {}
-
-    explicit triangle_manager(const simple_mesh& mesh):
-    _vertices(VERTEX_CAPACITY),
-    _triangles(TRIANGLE_CAPACITY),
-    _faces(FACE_CAPACITY) {
-        import_from_mesh(mesh);
-    }
 
     void clear() {
         _vertices.clear();
@@ -175,7 +182,7 @@ public:
         _tetrahedrons.clear();
     }
 
-    void add_triangle_to_face(uint32_t v1i, uint32_t v2i, uint32_t v3i) {
+    bool add_triangle_to_face(uint32_t v1i, uint32_t v2i, uint32_t v3i) {
         auto v1p = _vertices[v1i].pos;
         auto v2p = _vertices[v2i].pos;
         auto v3p = _vertices[v3i].pos;
@@ -185,68 +192,91 @@ public:
         // use normal to identify a face
         polygon new_face(n);
         uint32_t face_id = _faces.index_of(new_face);
-        if (face_id != NOT_FOUND) {
-            // insert the new vertex into the appropriate place
-            uint32_t count = _faces[face_id].vert_ids.size();
-            for (int i = 0; i < count; i++) {
-                for (int j = 0; j < 3; j++) {
-                    uint32_t u1 = _faces[face_id].vert_ids[i], u2 = _faces[face_id].vert_ids[(i + 1) % count];
-                    uint32_t v1 = vs[j], v2 = vs[(j + 1) % 3];
-                    if ((u1 == v1 && u2 == v2) || (u1 == v2 && u2 == v1)) {
-                        _faces[face_id].add_vert(vs[(j + 2) % 3], (i + 1) % count);
-                        return;
-                    }
-                }
-            }
-        } else {
+
+        // if the face doesn't exist, create a new one
+        if (face_id == NOT_FOUND) {
             for (auto v : vs) {
                 new_face.add_vert(v);
             }
             _faces.push_back(new_face);
+            return true;
         }
+
+        // check if a new vertex needs to be added or removed
+        uint32_t count = _faces[face_id].vert_ids.size();
+        for (int i = 0; i < count; i++) {
+            uint32_t u1 = _faces[face_id].vert_ids[i],
+                     u2 = _faces[face_id].vert_ids[(i + 1) % count],
+                     u3 = _faces[face_id].vert_ids[(i + 2) % count];
+            // already contains all 3 vertices: need to remove
+            // note: only remove the index, not actually remove the vertex,
+            // which will not affect the correctness of the mesh structure.
+            // removing vertex costs a lot of time, and should be avoided.
+            if ((u1 == v1i || u2 == v2i || u3 == v3i) &&
+                (u1 == v2i || u2 == v3i || u3 == v1i) &&
+                (u1 == v3i || u2 == v1i || u3 == v2i)) {
+                _faces[face_id].remove_vert((i + 1) % count);
+                return true;
+            }
+
+            // only contains 2 vertices: need to add
+            for (int j = 0; j < 3; j++) {
+                uint32_t v1 = vs[j], v2 = vs[(j + 1) % 3];
+                if ((u1 == v1 && u2 == v2) || (u1 == v2 && u2 == v1)) {
+                    _faces[face_id].add_vert(vs[(j + 2) % 3], (i + 1) % count);
+                    return true;
+                }
+            }
+        }
+
+        // this means the triangle is separated from the face, should be added
+        // later. (until this triangle is right close to the border)
+        return false;
     }
 
-    void to_triangles() {
-        // transform faces into triangles
-        clear_triangles();
-        for (auto& face : _faces) {
-            uint32_t count = face.vert_ids.size();
-            for (int i = 1; i < count - 1; i++) {
-                add_triangle(face.vert_ids[0], face.vert_ids[i], face.vert_ids[i + 1]);
+    void import_from_mesh(const simple_mesh& mesh) {
+        // import data from a new mesh, automatically generate faces, simplify
+        // the mesh structure and merge into current mesh.
+        clear();
+        ASSERT(mesh.vertices.size() == mesh.normals.size() && mesh.indices.size() % 3 == 0);
+
+        // add vertices
+        uint32_t vert_count = mesh.vertices.size();
+        std::vector<uint32_t> vert_ids(vert_count);
+        for (uint32_t i = 0; i < vert_count; i++) {
+            vert_ids[i] = add_vertex(mesh.vertices[i], mesh.normals[i]);
+        }
+
+        // add faces: need to re-add until all triangles are added to face
+        uint32_t tri_count = mesh.indices.size() / 3;
+        std::vector<bool> tri_added(tri_count, false);
+        int num = 0;
+        while (num != tri_count) {
+            for (uint32_t i = 0; i < tri_count; i++) {
+                uint32_t base = i * 3;
+                !tri_added[i] && (tri_added[i] = add_triangle_to_face(
+                        mesh.indices[base], mesh.indices[base + 1], mesh.indices[base + 2])) && ++num;
             }
         }
     }
 
-    void import_from_mesh(const simple_mesh& mesh) {
-        // import the mesh data from a mesh (not standard format, but will
-        // be automatically transformed into)
-        ASSERT(mesh.vertices.size() == mesh.normals.size() && mesh.indices.size() % 3 == 0);
-        clear();
-
-        std::vector<uint32_t> vert_ids(mesh.vertices.size());
-        uint32_t vert_count = mesh.vertices.size(), idx_count = mesh.indices.size();
-        for (uint32_t i = 0; i < vert_count; i++) {
-            vert_ids[i] = add_vertex(mesh.vertices[i], mesh.normals[i]);
-        }
-        for (uint32_t i = 0; i < idx_count; i += 3) {
-            add_triangle(vert_ids[mesh.indices[i]], vert_ids[mesh.indices[i + 1]], vert_ids[mesh.indices[i + 2]]);
-            add_triangle_to_face(mesh.indices[i], mesh.indices[i + 1], mesh.indices[i + 2]);
-        }
-    }
-
     void export_to_mesh(simple_mesh& mesh) {
-        // export the mesh data into a mesh (standard format)
+        // export the mesh data into a mesh
         mesh.clear();
+        to_triangles();
         uint32_t vert_size = _vertices.size(), tri_size = _triangles.size();
 
         mesh.vertices.resize(vert_size);
         mesh.normals.resize(vert_size);
         mesh.indices.resize(tri_size * 3);
 
+        // export vertices
         for (uint32_t i = 0; i < vert_size; i++) {
             mesh.vertices[i] = _vertices[i].pos;
             mesh.normals[i] = _vertices[i].nor;
         }
+
+        // export triangles
         for (uint32_t i = 0; i < tri_size; i++) {
             uint32_t base = i * 3;
             mesh.indices[base] = _triangles[i].vert_ids[0];

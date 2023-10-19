@@ -32,7 +32,8 @@ private:
 
     void cut_mesh(const simple_mesh& mesh, std::vector<simple_mesh>& new_meshes) {
         uint32_t point_count = _voronoi.point_count();
-        triangle_manager worker(mesh);
+        triangle_manager worker;
+        worker.import_from_mesh(mesh);
 
         // generate the new meshes of each point
         for (uint32_t i = 0; i < point_count; i++) {
@@ -57,8 +58,6 @@ private:
             cut_mesh_by_plane(new_mesh, center, normal, result);
             new_mesh = result;
         }
-
-        new_mesh.to_triangles();
     }
 
     static void cut_mesh_by_plane(triangle_manager& old_mesh, const Vector3& p, const Vector3& n, triangle_manager& new_mesh) {

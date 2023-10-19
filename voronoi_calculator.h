@@ -1,9 +1,9 @@
 #pragma once
 
-#include <vector>
-#include <algorithm>
 #include "triangle_manager.h"
 #include "utils.h"
+#include <vector>
+#include <algorithm>
 
 PHYS_NAMESPACE_BEGIN
 

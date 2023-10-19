@@ -10,6 +10,7 @@
 #include <windows.h>
 #include <random>
 #include <fstream>
+#include <sstream>
 
 void mesh_to_obj(const physeng::simple_mesh& mesh, const std::string& filename) {
     std::ofstream file(filename);
@@ -24,6 +25,33 @@ void mesh_to_obj(const physeng::simple_mesh& mesh, const std::string& filename) 
         file << "f " << mesh.indices[i] + 1 << "//" << mesh.indices[i] + 1 << " "
              << mesh.indices[i + 1] + 1 << "//" << mesh.indices[i + 1] + 1 << " "
              << mesh.indices[i + 2] + 1 << "//" << mesh.indices[i + 2] + 1 << std::endl;
+    }
+    file.close();
+}
+
+void obj_to_mesh(const std::string& filename, physeng::simple_mesh& mesh) {
+    std::ifstream file(filename);
+    std::string line;
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string type;
+        ss >> type;
+        if (type == "v") {
+            Real x, y, z;
+            ss >> x >> y >> z;
+            mesh.vertices.emplace_back(x, y, z);
+        } else if (type == "vn") {
+            Real x, y, z;
+            ss >> x >> y >> z;
+            mesh.normals.emplace_back(x, y, z);
+        } else if (type == "f") {
+            uint32_t v1, v2, v3;
+            char tmp;
+            ss >> v1 >> tmp >> tmp >> v1 >> v2 >> tmp >> tmp >> v2 >> v3;
+            mesh.indices.push_back(v1 - 1);
+            mesh.indices.push_back(v2 - 1);
+            mesh.indices.push_back(v3 - 1);
+        }
     }
     file.close();
 }
@@ -308,11 +336,18 @@ int main()
                 20, 22, 23,
             }
     };
+
     hash_vector<physeng::Vector3> points(100);
     for (int i = 0; i < 50; i++) {
         points.push_back(random_point());
     }
-//    mesh_to_obj(mesh, "../cube.obj");
+//    std::vector<physeng::Vector3> points = {
+//            {0.2, 0.2, 0.6},
+//            {0.8, 0.2, 0.5},
+//            {0.5, 0.8, 0.4}
+//    };
+
+    mesh_to_obj(mesh, "../cube.obj");
     std::vector<physeng::simple_mesh> results;
     DWORD start, end;
     start = GetTickCount();
@@ -323,23 +358,54 @@ int main()
         mesh_to_obj(result, "../mesh" + std::to_string(&result - &results[0]) + ".obj");
     }
 
-    // test for plane segmentation
-//    physeng::triangle_manager old_mesh(mesh), new_mesh, new_new_mesh;
+    physeng::triangle_manager manager;
+    manager.import_from_mesh(results[0]);
+    physeng::simple_mesh merge_result;
+    manager.export_to_mesh(merge_result);
+    mesh_to_obj(merge_result, "../merge_result.obj");
+
+//    // test for import mesh
+//    physeng::simple_mesh mesh = {
+//            {
+//                    {0, 0, 0},
+//                    {1, 0, 0},
+//                    {2, 0, 0},
+//                    {1, 1, 0},
+//                    {2, 1, 0},
+//                    {1, -1, 0},
+//                    {0, 1, 0},
+//                    {3, 1, 0}
+//            },
+//            {
+//                    {0, 0, 1},
+//                    {0, 0, 1},
+//                    {0, 0, 1},
+//                    {0, 0, 1},
+//                    {0, 0, 1},
+//                    {0, 0, 1},
+//                    {0, 0, 1},
+//                    {0, 0, 1}
+//            },
+//            {
+//                0, 5, 1,
+//                0, 1, 3,
+//                1, 5, 2,
+//                0, 3, 6,
+//                1, 2, 4,
+//                2, 7, 4,
+//                1, 4, 3
+//            }
+//    };
+//    mesh_to_obj(mesh, "../mesh_merge_test.obj");
+//    physeng::triangle_manager manager;
+//    manager.merge(mesh);
+//    std::cout << "vertex: " << manager.vertex_count() << std::endl;
+//    std::cout << "triangle: " << manager.triangle_count() << std::endl;
+//    std::cout << "face: " << manager.face_count() << std::endl;
+//    std::cout << "tetrahedron: " << manager.tetrahedron_count() << std::endl;
 //    physeng::simple_mesh result;
-//
-//    auto p = (points[0] + points[1]) / 2;
-//    auto n = (points[0] - points[1]).normalized();
-//    physeng::fracture_calculator::cut_mesh_by_plane(old_mesh, p, n, new_mesh);
-//    new_mesh.to_triangles();
-//    new_mesh.export_to_mesh(result);
-//    mesh_to_obj(result, "../mesh_test1.obj");
-//
-//    p = (points[2] + points[1]) / 2;
-//    n = (points[2] - points[1]).normalized();
-//    physeng::fracture_calculator::cut_mesh_by_plane(new_mesh, p, n, new_new_mesh);
-//    new_new_mesh.to_triangles();
-//    new_new_mesh.export_to_mesh(result);
-//    mesh_to_obj(result, "../mesh_test2.obj");
+//    manager.export_to(result);
+//    mesh_to_obj(result, "../mesh_merge_result.obj");
 
     return 0;
 }

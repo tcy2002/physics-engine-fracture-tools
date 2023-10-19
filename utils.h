@@ -6,7 +6,7 @@
 PHYS_NAMESPACE_BEGIN
 
 /**
- * @brief This file provides some math utilities for
+ * @brief This file provides some data and math utilities for
  * fracture calculation.
  */
 
@@ -102,45 +102,8 @@ FORCE_INLINE bool is_point_inside_sphere(const Vector3& p, const Vector3& center
     return (p - center).norm() < radius - EPS;
 }
 
-FORCE_INLINE bool are_points_on_line(const Vector3& p, const Vector3& v1, const Vector3& v2, int& pos) {
-    /*
-     * when return true:
-     * pos = 0: p is on v1v2
-     * pos = -1: p shares the same position with v1
-     * pos = 1: p shares the same position with v2
-     * pos = -2: p is beyond v1's side
-     * pos = 2: p is beyond v2's side
-     */
-    auto v1p = v1 - p, v2p = v2 - p;
-    if (approx_equal(v1p.norm(), 0)) {
-        pos = -1;
-        return true;
-    }
-    if (approx_equal(v2p.norm(), 0)) {
-        pos = 1;
-        return true;
-    }
-
-    Real n = cross(v1p.normalized(), v2p.normalized()).norm();
-
-    if (!approx_equal(n, 0)) {
-        return false;
-    }
-
-    Real d = dot(v1p, v2p);
-    if (d < 0) {
-        pos = 0;
-        return true;
-    }
-
-    d = dot(-v1p, v2 - v1);
-    if (d < 0) {
-        pos = -2;
-        return true;
-    }
-
-    pos = 2;
-    return true;
+FORCE_INLINE bool are_points_collinear(const Vector3& v1, const Vector3& v2, const Vector3& v3) {
+    return approx_equal(cross(v1 - v2, v3 - v2).norm(), 0);
 }
 
 template <typename T>
@@ -156,7 +119,6 @@ FORCE_INLINE void sort3(T& v1, T& v2, T& v3) {
     }
 }
 
-/****** some data structure used by triangle_manager ***************************/
 struct vertex {
     Vector3 pos;
     Vector3 nor;
@@ -186,6 +148,13 @@ struct polygon {
             vert_ids.insert(vert_ids.begin() + idx, v);
         }
     }
+    bool remove_vert(uint32_t idx) {
+        if (idx >= vert_ids.size()) {
+            return false;
+        }
+        vert_ids.erase(vert_ids.begin() + idx);
+        return true;
+    }
     bool operator==(const polygon& p) const {
         return approx_equal(nor, p.nor);
     }
@@ -204,7 +173,9 @@ struct tetrahedron {
     }
 };
 
-// only used for I/O between upper layer and fracture process,
+/**
+ * @brief only used for I/O between upper layer and fracture process,
+ */
 struct simple_mesh {
     std::vector<Vector3> vertices;
     std::vector<Vector3> normals;
@@ -215,7 +186,6 @@ struct simple_mesh {
         indices.clear();
     }
 };
-/*******************************************************************************/
 
 PHYS_NAMESPACE_END
 
