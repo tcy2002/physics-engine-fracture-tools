@@ -1,6 +1,13 @@
-cmake_minimum_required(VERSION 3.21)
-project(test)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
-set(CMAKE_CXX_STANDARD 14)
+project(PhysEngine)
 
-add_executable(test main.cpp general.h test_vector.h hash_vector.h triangle_manager.h utils.h vector3.h real.h voronoi_calculator.h fracture_calculator.h)
+SET(CMAKE_CXX_STANDARD 17)
+
+include_directories(. eigen)
+
+add_subdirectory(common)
+
+link_libraries(EngineCommon)
+
+add_executable(test main.cpp)

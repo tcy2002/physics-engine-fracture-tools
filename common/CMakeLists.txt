@@ -1,0 +1,13 @@
+file(GLOB_RECURSE CPP_FILE
+	${CMAKE_CURRENT_SOURCE_DIR}/*.c
+	${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+    
+file(GLOB_RECURSE HPP_FILE
+	${CMAKE_CURRENT_SOURCE_DIR}/*.h
+	${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
+
+add_library(
+    EngineCommon
+    ${CPP_FILE}
+    ${HPP_FILE}
+)
